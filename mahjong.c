@@ -10,12 +10,12 @@
 #define DEG2RAD (3.14159265358979323846f/180.0f)
 #endif
 
-// Oyun Durumları
+// Kanka, oyun durumlarını bu sayılarla takip ediyoruz:
 #define STATE_WELCOME  0
 #define STATE_PLAYING  1
 #define STATE_WON      2
 
-// Taş Tipleri
+// Taşların tipleri de bunlar. Mahjong'da 7 ana grup var biliyorsun:
 #define TYPE_DOTS       0 // Noktalar (Pin)
 #define TYPE_BAMBOO     1 // Bambular (Sou)
 #define TYPE_CHARS      2 // Karakterler (Wan)
@@ -24,14 +24,14 @@
 #define TYPE_SEASONS    5 // Mevsimler (İlkbahar, Yaz, Sonbahar, Kış)
 #define TYPE_FLOWERS    6 // Çiçekler (Erik, Orkide, Krizantem, Bambu)
 
-// Taş Yapısı
+// Her bir taşın tüm özelliklerini bu pakette topladık:
 typedef struct {
-    int type;   // Taş Tipi
-    int value;  // Taş Değeri (1-9 veya 1-4)
-    int id;     // Benzersiz ID
+    int type;   // Taşın tipi (Nokta mı, bambu mu vb.)
+    int value;  // Taşın değeri (1-9 veya rüzgarlar/çiçekler için 1-4)
+    int id;     // Taşları tek tek ayırt edebilmek için benzersiz kimlik numarası
 } Tile;
 
-// Tahta Hücresi Yapısı
+// Tahta hücresinin durumunu saklayan yapı. Hangisi nerede duruyor, aktif mi pasif mi:
 typedef struct {
     Tile tile;
     int x;
@@ -40,7 +40,7 @@ typedef struct {
     bool active;
 } BoardTile;
 
-// Geri Alma Yapısı
+// Yaptığımız eşleşmeleri hafızada tutup geri alabilmek için bu yapıyı kullanıyoruz:
 typedef struct {
     int z1, y1, x1;
     Tile t1;
@@ -48,7 +48,7 @@ typedef struct {
     Tile t2;
 } UndoAction;
 
-// Buton Yapısı
+// Sağ taraftaki menüde duran şık butonlarımızın koordinatları ve renkleri:
 typedef struct {
     Rectangle rect;
     const char *text;
@@ -56,7 +56,7 @@ typedef struct {
     Color hover_color;
 } GuiButton;
 
-// Oyun Durumu Yapısı
+// Oyunun tüm beynini, süresini, skorunu ve tahtasını bu dev yapıda saklıyoruz:
 typedef struct {
     BoardTile board[4][8][12];
     int selected_z, selected_y, selected_x;
@@ -74,7 +74,7 @@ typedef struct {
 GameState game;
 int current_state = STATE_WELCOME;
 
-// Layout koordinat sabitleyicileri
+// Tahtayı ekranın ortasına güzelce hizalamak için kullandığımız koordinatlar:
 const int start_x = 70;
 const int start_y = 60;
 const int spacing_x = 54;
@@ -82,39 +82,39 @@ const int spacing_y = 70;
 const int tile_w = 50;
 const int tile_h = 68;
 
-// Taş Eşleşme Mantığı
+// İki taş birbirinin eşi mi diye bakıyoruz. Mevsimler ve çiçekler kendi aralarında serbestçe eşleşebilir:
 bool tiles_match(Tile t1, Tile t2) {
     if (t1.type != t2.type) return false;
-    // Mevsimler ve Çiçekler kendi aralarında eşleşebilir
+    // Mevsimler ve Çiçekler kendi gruplarındaki herhangi bir taşla eşleşebilir kanka, kural böyle.
     if (t1.type == TYPE_SEASONS || t1.type == TYPE_FLOWERS) {
         return true;
     }
     return t1.value == t2.value;
 }
 
-// Hücre aktif mi kontrolü
+// Tahtanın o hücresinde hâlâ duran aktif bir taş var mı kontrolü:
 bool is_tile_active(int z, int y, int x) {
     if (z < 0 || z >= 4 || y < 0 || y >= 8 || x < 0 || x >= 12) return false;
     return game.board[z][y][x].active;
 }
 
-// Taşın serbest (seçilebilir) olup olmadığını kontrol eder
+// En kritik kural! Taşın üstü boş mu ve sağ/sol taraflarından en az biri açık mı diye bakıyoruz:
 bool is_tile_free(int z, int y, int x) {
     if (!is_tile_active(z, y, x)) return false;
     
-    // Üzerinde aktif bir taş var mı?
+    // Üzerinde (bir üst katmanda) aktif taş varsa bu taş kilitlidir kanka, seçemeyiz.
     if (z < 3 && is_tile_active(z + 1, y, x)) {
         return false;
     }
     
-    // Solunda veya sağında aktif bir taş yoksa serbesttir
+    // Sağında ya da solunda taş yoksa bu taş serbesttir.
     bool left_free = (x == 0) || !is_tile_active(z, y, x - 1);
     bool right_free = (x == 11) || !is_tile_active(z, y, x + 1);
     
     return left_free || right_free;
 }
 
-// Mevcut aktif taş sayısını döndürür
+// Tahtada kalan toplam aktif taş sayısı:
 int get_remaining_tiles() {
     int count = 0;
     for (int z = 0; z < 4; z++) {
@@ -127,7 +127,7 @@ int get_remaining_tiles() {
     return count;
 }
 
-// Yapılabilecek hamleleri bulur ve sayısını döndürür
+// Yapılabilecek hamle var mı diye tahtayı didik didik arayan fonksiyon. İpucu için ilk eşi de bulup getirir:
 int get_available_moves(int *p_z1, int *p_y1, int *p_x1, int *p_z2, int *p_y2, int *p_x2) {
     int count = 0;
     for (int i = 0; i < 384; i++) {
@@ -156,7 +156,7 @@ int get_available_moves(int *p_z1, int *p_y1, int *p_x1, int *p_z2, int *p_y2, i
     return count;
 }
 
-// Tahtayı yeniden karıştırır
+// Tıkandığında kalan tüm taşları toplayıp, karıştırıp, aynı yerlerine geri dizen cankurtaran fonksiyon:
 void reshuffle_board() {
     Tile active_tiles[144];
     int active_count = 0;
@@ -173,7 +173,7 @@ void reshuffle_board() {
     
     if (active_count == 0) return;
     
-    // Karıştır
+    // Fisher-Yates algoritmasıyla kalan aktif taşları karıştırıyoruz:
     for (int i = active_count - 1; i > 0; i--) {
         int j = rand() % (i + 1);
         Tile temp = active_tiles[i];
@@ -181,7 +181,7 @@ void reshuffle_board() {
         active_tiles[j] = temp;
     }
     
-    // Geri yerleştir
+    // Karışan taşları tahtadaki aynı yerlerine geri yerleştiriyoruz:
     int idx = 0;
     for (int z = 0; z < 4; z++) {
         for (int y = 0; y < 8; y++) {
@@ -194,7 +194,7 @@ void reshuffle_board() {
     }
 }
 
-// Geri alma stack işlemleri
+// Son yaptığımız hamleyi geri alabilmemiz için geçmişe ekleyen ve çıkaran fonksiyonlar:
 void push_undo(int z1, int y1, int x1, Tile t1, int z2, int y2, int x2, Tile t2) {
     if (game.undo_ptr < 72) {
         game.undo_stack[game.undo_ptr++] = (UndoAction){z1, y1, x1, t1, z2, y2, x2, t2};
@@ -217,11 +217,11 @@ bool pop_undo(int *z1, int *y1, int *x1, Tile *t1, int *z2, int *y2, int *x2, Ti
     return false;
 }
 
-// Şablon Maske Tanımlama (144 Taşlık Simetrik Piramit)
+// 144 taşı simetrik ve 3 boyutlu bir piramit halinde dizmek için kullandığımız maske şablonu:
 void init_layout_mask(bool mask[4][8][12]) {
     memset(mask, 0, sizeof(bool) * 4 * 8 * 12);
     
-    // Kat 0 (Alt Kat - 80 taş)
+    // Kat 0 (En alt katman - toplam 80 taş diziyoruz):
     for (int x = 3; x <= 8; x++) mask[0][0][x] = true;
     for (int x = 1; x <= 10; x++) mask[0][1][x] = true;
     for (int y = 2; y <= 5; y++) {
@@ -230,75 +230,75 @@ void init_layout_mask(bool mask[4][8][12]) {
     for (int x = 1; x <= 10; x++) mask[0][6][x] = true;
     for (int x = 3; x <= 8; x++) mask[0][7][x] = true;
     
-    // Kat 1 (44 taş)
+    // Kat 1 (Orta katman - toplam 44 taş diziyoruz):
     for (int x = 3; x <= 8; x++) mask[1][1][x] = true;
     for (int y = 2; y <= 5; y++) {
         for (int x = 2; x <= 9; x++) mask[1][y][x] = true;
     }
     for (int x = 3; x <= 8; x++) mask[1][6][x] = true;
     
-    // Kat 2 (16 taş)
+    // Kat 2 (Üst orta katman - toplam 16 taş diziyoruz):
     for (int y = 2; y <= 5; y++) {
         for (int x = 4; x <= 7; x++) mask[2][y][x] = true;
     }
     
-    // Kat 3 (En Üst Kat - 4 taş)
+    // Kat 3 (En üst katman - toplam 4 taş diziyoruz):
     for (int y = 3; y <= 4; y++) {
         for (int x = 5; x <= 6; x++) mask[3][y][x] = true;
     }
 }
 
-// Deste oluşturma
+// Standart 144 taşlık Mahjong destemizi tek tek doldurduğumuz yer:
 void generate_deck(Tile deck[144]) {
     int idx = 0;
-    // Noktalar
+    // Noktalar (Dots)
     for (int val = 1; val <= 9; val++) {
         for (int i = 0; i < 4; i++) {
             deck[idx] = (Tile){TYPE_DOTS, val, idx};
             idx++;
         }
     }
-    // Bambular
+    // Bambular (Bamboos)
     for (int val = 1; val <= 9; val++) {
         for (int i = 0; i < 4; i++) {
             deck[idx] = (Tile){TYPE_BAMBOO, val, idx};
             idx++;
         }
     }
-    // Karakterler
+    // Karakterler (Characters)
     for (int val = 1; val <= 9; val++) {
         for (int i = 0; i < 4; i++) {
             deck[idx] = (Tile){TYPE_CHARS, val, idx};
             idx++;
         }
     }
-    // Rüzgarlar
+    // Rüzgarlar (Winds)
     for (int val = 1; val <= 4; val++) {
         for (int i = 0; i < 4; i++) {
             deck[idx] = (Tile){TYPE_WINDS, val, idx};
             idx++;
         }
     }
-    // Ejderhalar
+    // Ejderhalar (Dragons)
     for (int val = 1; val <= 3; val++) {
         for (int i = 0; i < 4; i++) {
             deck[idx] = (Tile){TYPE_DRAGONS, val, idx};
             idx++;
         }
     }
-    // Mevsimler
+    // Mevsimler (Seasons)
     for (int val = 1; val <= 4; val++) {
         deck[idx] = (Tile){TYPE_SEASONS, val, idx};
         idx++;
     }
-    // Çiçekler
+    // Çiçekler (Flowers)
     for (int val = 1; val <= 4; val++) {
         deck[idx] = (Tile){TYPE_FLOWERS, val, idx};
         idx++;
     }
 }
 
-// Yeni oyun başlatma
+// Oyunu sıfırdan kurup, desteyi karıştırıp, tahtayı hazırlayan başlangıç fonksiyonu:
 void init_game() {
     bool mask[4][8][12];
     init_layout_mask(mask);
@@ -306,7 +306,7 @@ void init_game() {
     Tile deck[144];
     generate_deck(deck);
     
-    // Karıştır (Fisher-Yates)
+    // Desteyi güzelce karıştırıyoruz kanka:
     for (int i = 143; i > 0; i--) {
         int j = rand() % (i + 1);
         Tile temp = deck[i];
@@ -342,7 +342,7 @@ void init_game() {
     game.has_won = false;
 }
 
-// Taş sembolünü alır
+// Taşın tipine göre sağ üst köşeye basacağımız 2 harfli kodu veriyor:
 void get_tile_symbol(Tile t, char *buf) {
     switch (t.type) {
         case TYPE_DOTS:       sprintf(buf, "D%d", t.value); break;
@@ -365,35 +365,35 @@ void get_tile_symbol(Tile t, char *buf) {
     }
 }
 
-// Taş rengini alır
+// Kartların üzerindeki şekilleri boyamak için renk kodları döndüren fonksiyon:
 Color get_tile_color(Tile t) {
     switch (t.type) {
-        case TYPE_DOTS:       return (Color){ 30, 120, 220, 255 };  // Mavi
-        case TYPE_BAMBOO:     return (Color){ 40, 160, 60, 255 };   // Yeşil
-        case TYPE_CHARS:      return (Color){ 200, 50, 50, 255 };   // Kırmızı
-        case TYPE_WINDS:      return (Color){ 80, 80, 90, 255 };    // Koyu Gri
+        case TYPE_DOTS:       return (Color){ 30, 120, 220, 255 };  // Mavi daireler
+        case TYPE_BAMBOO:     return (Color){ 40, 160, 60, 255 };   // Yeşil kareler
+        case TYPE_CHARS:      return (Color){ 200, 50, 50, 255 };   // Kırmızı üçgenler
+        case TYPE_WINDS:      return (Color){ 80, 80, 90, 255 };    // Altın yıldızlar (koyu gri taban)
         case TYPE_DRAGONS:
             if (t.value == 1) return (Color){ 200, 50, 50, 255 };
             if (t.value == 2) return (Color){ 40, 160, 60, 255 };
             return (Color){ 100, 100, 110, 255 };
-        case TYPE_SEASONS:    return (Color){ 220, 110, 20, 255 };  // Turuncu
-        case TYPE_FLOWERS:    return (Color){ 210, 40, 150, 255 };  // Pembe
+        case TYPE_SEASONS:    return (Color){ 220, 110, 20, 255 };  // Kırmızı/Turuncu kalpler
+        case TYPE_FLOWERS:    return (Color){ 210, 40, 150, 255 };  // Mor çarpılar
         default:              return BLACK;
     }
 }
 
-// Katman çizgi rengini alır
+// Taşların katman seviyesine göre kenarlık rengini belirliyor. Bu sayede 3D derinlik hissi oluşuyor:
 Color get_layer_border_color(int z) {
     switch (z) {
-        case 0: return (Color){ 160, 160, 165, 255 }; // Kat 0: Gri
-        case 1: return (Color){ 100, 180, 110, 255 }; // Kat 1: Yeşil
-        case 2: return (Color){ 80, 150, 220, 255 };  // Kat 2: Mavi
-        case 3: return (Color){ 230, 130, 40, 255 };  // Kat 3: Turuncu
+        case 0: return (Color){ 160, 160, 165, 255 }; // Katman 0: Sade Gri
+        case 1: return (Color){ 100, 180, 110, 255 }; // Katman 1: Tatlı Yeşil
+        case 2: return (Color){ 80, 150, 220, 255 };  // Katman 2: Hoş Mavi
+        case 3: return (Color){ 230, 130, 40, 255 };  // Katman 3: Parlak Turuncu
         default: return DARKGRAY;
     }
 }
 
-// Buton çizimi ve kontrolü
+// Butonları ekrana çizip, üzerine fare geldiğinde rengini değiştiren ve tıklandığında haber veren fonksiyon:
 bool DrawButton(GuiButton btn) {
     Vector2 mouse = GetMousePosition();
     bool hovered = CheckCollisionPointRec(mouse, btn.rect);
@@ -410,42 +410,44 @@ bool DrawButton(GuiButton btn) {
     return hovered && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
 }
 
+// Burası tek bir şekil çizdiğimiz ufak yardımcımız kanka:
 void DrawSingleShape(int x, int y, int shape_type, Color color) {
     switch (shape_type) {
-        case 0: // Daire (Circle)
+        case 0: // Daire
             DrawCircle(x, y, 5, color);
             DrawCircleLines(x, y, 5, ColorAlpha(BLACK, 0.4f));
             break;
-        case 1: // Kare (Square)
+        case 1: // Kare
             DrawRectangle(x - 5, y - 5, 10, 10, color);
             DrawRectangleLines(x - 5, y - 5, 10, 10, ColorAlpha(BLACK, 0.4f));
             break;
-        case 2: // Üçgen (Triangle)
+        case 2: // Üçgen
             DrawTriangle((Vector2){(float)x, (float)y - 6}, (Vector2){(float)x - 6, (float)y + 5}, (Vector2){(float)x + 6, (float)y + 5}, color);
             DrawTriangleLines((Vector2){(float)x, (float)y - 6}, (Vector2){(float)x - 6, (float)y + 5}, (Vector2){(float)x + 6, (float)y + 5}, ColorAlpha(BLACK, 0.4f));
             break;
-        case 3: // Yıldız (Star - David Star)
+        case 3: // Yıldız (Davut Yıldızı tekniğiyle iki iç içe üçgen yapıyoruz)
             DrawTriangle((Vector2){(float)x, (float)y - 7}, (Vector2){(float)x - 6, (float)y + 3}, (Vector2){(float)x + 6, (float)y + 3}, color);
             DrawTriangle((Vector2){(float)x - 6, (float)y - 3}, (Vector2){(float)x + 6, (float)y - 3}, (Vector2){(float)x, (float)y + 7}, color);
             break;
-        case 4: // Karo (Diamond)
+        case 4: // Karo (Baklava)
             DrawTriangle((Vector2){(float)x, (float)y - 7}, (Vector2){(float)x - 6, (float)y}, (Vector2){(float)x + 6, (float)y}, color);
             DrawTriangle((Vector2){(float)x - 6, (float)y}, (Vector2){(float)x + 6, (float)y}, (Vector2){(float)x, (float)y + 7}, color);
             DrawTriangleLines((Vector2){(float)x, (float)y - 7}, (Vector2){(float)x - 6, (float)y}, (Vector2){(float)x + 6, (float)y}, ColorAlpha(BLACK, 0.4f));
             DrawTriangleLines((Vector2){(float)x - 6, (float)y}, (Vector2){(float)x + 6, (float)y}, (Vector2){(float)x, (float)y + 7}, ColorAlpha(BLACK, 0.4f));
             break;
-        case 5: // Kalp (Heart)
+        case 5: // Kalp
             DrawCircle(x - 3, y - 2, 4, color);
             DrawCircle(x + 3, y - 2, 4, color);
             DrawTriangle((Vector2){(float)x - 7, (float)y - 1}, (Vector2){(float)x + 7, (float)y - 1}, (Vector2){(float)x, (float)y + 7}, color);
             break;
-        case 6: // Çarpı (Cross)
+        case 6: // Çarpı (X işareti)
             DrawLineEx((Vector2){(float)x - 5, (float)y - 5}, (Vector2){(float)x + 5, (float)y + 5}, 2.0f, color);
             DrawLineEx((Vector2){(float)x - 5, (float)y + 5}, (Vector2){(float)x + 5, (float)y - 5}, 2.0f, color);
             break;
     }
 }
 
+// Kartların üzerindeki şekilleri sayı değerine göre simetrik dizen döngüler:
 void DrawMultipleShapes(int cx, int cy, int count, int shape_type, Color color) {
     if (count == 1) {
         DrawSingleShape(cx, cy, shape_type, color);
@@ -495,6 +497,7 @@ void DrawMultipleShapes(int cx, int cy, int count, int shape_type, Color color) 
     }
 }
 
+// Taş tiplerine göre hangi şekli çizeceğimizi belirleyen kısım:
 void DrawTileSymbol(int bx, int by, Tile t) {
     int cx = bx + tile_w / 2;
     int cy = by + tile_h / 2;
@@ -504,54 +507,54 @@ void DrawTileSymbol(int bx, int by, Tile t) {
     
     switch (t.type) {
         case TYPE_DOTS:
-            shape_type = 0; // Daire
-            shape_color = (Color){ 30, 120, 220, 255 }; // Mavi
+            shape_type = 0; // Daire çizeceğiz kanka
+            shape_color = (Color){ 30, 120, 220, 255 };
             break;
         case TYPE_BAMBOO:
-            shape_type = 1; // Kare
-            shape_color = (Color){ 40, 160, 60, 255 }; // Yeşil
+            shape_type = 1; // Kare çizeceğiz
+            shape_color = (Color){ 40, 160, 60, 255 };
             break;
         case TYPE_CHARS:
-            shape_type = 2; // Üçgen
-            shape_color = (Color){ 200, 50, 50, 255 }; // Kırmızı
+            shape_type = 2; // Üçgen çizeceğiz
+            shape_color = (Color){ 200, 50, 50, 255 };
             break;
         case TYPE_WINDS:
-            shape_type = 3; // Yıldız
-            shape_color = (Color){ 220, 180, 40, 255 }; // Altın
+            shape_type = 3; // Yıldız çizeceğiz
+            shape_color = (Color){ 220, 180, 40, 255 };
             break;
         case TYPE_DRAGONS:
-            shape_type = 4; // Karo
-            shape_color = (Color){ 120, 120, 140, 255 }; // Gri
+            shape_type = 4; // Karo çizeceğiz
+            shape_color = (Color){ 120, 120, 140, 255 };
             break;
         case TYPE_SEASONS:
-            shape_type = 5; // Kalp
-            shape_color = (Color){ 220, 80, 80, 255 }; // Pembe/Kırmızı
+            shape_type = 5; // Kalp çizeceğiz
+            shape_color = (Color){ 220, 80, 80, 255 };
             break;
         case TYPE_FLOWERS:
-            shape_type = 6; // Çarpı
-            shape_color = (Color){ 180, 60, 180, 255 }; // Mor
+            shape_type = 6; // Çarpı çizeceğiz
+            shape_color = (Color){ 180, 60, 180, 255 };
             break;
     }
     
     DrawMultipleShapes(cx, cy, t.value, shape_type, shape_color);
 }
 
-// Tek bir taşı çizen yardımcı fonksiyon
+// Ekrana 3D gölgeli, kenarlıklı, sembollü tek bir Mahjong taşı çizen fonksiyonumuz:
 void DrawTileObject(int z, int y, int x, Tile tile, bool hovered, bool selected, bool is_hint) {
     int bx = start_x + x * spacing_x - z * 4;
     int by = start_y + y * spacing_y - z * 4;
     
-    // 3D Gölge/Kalınlık katmanı (Yeşil taban)
+    // 3D Gölge/Kalınlık katmanı (Yeşil taban):
     DrawRectangleRounded((Rectangle){ bx + 3, by + 3, tile_w, tile_h }, 0.15f, 4, (Color){ 30, 70, 50, 255 });
     
-    // Taşın fildişi gövdesi
+    // Taşın fildişi gövdesi:
     DrawRectangleRounded((Rectangle){ bx, by, tile_w, tile_h }, 0.15f, 4, (Color){ 245, 245, 240, 255 });
     
-    // Kenarlık
+    // Kenarlık:
     Color border_color = get_layer_border_color(z);
     DrawRectangleRoundedLines((Rectangle){ bx, by, tile_w, tile_h }, 0.15f, 4, border_color);
     
-    // Yanıp sönen ipucu efekti
+    // Yanıp sönen ipucu efekti:
     if (is_hint) {
         float time_sec = GetTime();
         if (((int)(time_sec * 4.0f) % 2) == 0) {
@@ -559,39 +562,40 @@ void DrawTileObject(int z, int y, int x, Tile tile, bool hovered, bool selected,
         }
     }
     
-    // Seçim efekti (yarı saydam mavi)
+    // Seçim efekti (yarı saydam maviyle kaplıyoruz):
     if (selected) {
         DrawRectangleRounded((Rectangle){ bx, by, tile_w, tile_h }, 0.15f, 4, (Color){ 50, 150, 250, 100 });
     }
     
-    // Üzerinde gezinme (hover) efekti
+    // Üzerinde gezinme (hover) efekti:
     if (hovered) {
         DrawRectangleRoundedLines((Rectangle){ bx, by, tile_w, tile_h }, 0.15f, 4, GOLD);
     }
     
-    // Sembol çizimi (Grafiksel şekiller)
+    // Sembol çizimi (Grafiksel şekiller):
     DrawTileSymbol(bx, by, tile);
     
-    // Küçük Kod Göstergesi (Sağ Üst Köşe)
+    // Küçük Kod Göstergesi (Sağ Üst Köşede minikçe yazar):
     char sym[8];
     get_tile_symbol(tile, sym);
     DrawText(sym, bx + tile_w - MeasureText(sym, 10) - 5, by + 4, 10, DARKGRAY);
     
-    // Katman numarası
+    // Katman numarası (Sol üst köşede):
     char z_str[2];
     sprintf(z_str, "%d", z);
     DrawText(z_str, bx + 5, by + 4, 10, DARKGRAY);
 }
 
+// Burası oyunun kalbi, ana döngümüzün döndüğü yer kanka:
 int main() {
-    // Grafik penceresini oluştur
+    // Raylib penceresini 1020x720 çözünürlükle açıyoruz kanka:
     InitWindow(1020, 720, "Mahjong Solitaire - Shanghai");
     SetTargetFPS(60);
     
-    // Rastgele sayı üretecini başlat
+    // Her oyunda taşlar rastgele dağılsın diye zamana göre tohumlama yapıyoruz:
     srand(time(NULL));
     
-    // Buton şablonları
+    // Sağ taraftaki HINT, UNDO gibi butonlarımızın yerlerini ve renklerini tanımlıyoruz:
     GuiButton btn_hint = { { 845, 160, 140, 40 }, "HINT", (Color){ 50, 120, 220, 255 }, (Color){ 70, 140, 240, 255 } };
     GuiButton btn_undo = { { 845, 215, 140, 40 }, "UNDO", (Color){ 120, 80, 180, 255 }, (Color){ 140, 100, 200, 255 } };
     GuiButton btn_shuffle = { { 845, 270, 140, 40 }, "SHUFFLE", (Color){ 200, 100, 50, 255 }, (Color){ 220, 120, 70, 255 } };
@@ -603,7 +607,7 @@ int main() {
         if (current_state == STATE_PLAYING) {
             game.elapsed_seconds = (int)(time(NULL) - game.start_time);
             
-            // Galibiyet kontrolü
+            // Tahtada hiç taş kalmadıysa oyuncu kazanmış demektir! durumunu STATE_WON yapıyoruz:
             if (get_remaining_tiles() == 0) {
                 game.has_won = true;
                 current_state = STATE_WON;
@@ -612,14 +616,14 @@ int main() {
         
         // --- 2. ÇİZİM DÖNGÜSÜ ---
         BeginDrawing();
-        ClearBackground((Color){ 24, 80, 48, 255 }); // Yeşil masa örtüsü rengi
+        ClearBackground((Color){ 24, 80, 48, 255 }); // Yeşil masa örtüsü rengi (kumarhane çuhası kanka)
         
         if (current_state == STATE_WELCOME) {
             // --- HOŞ GELDİNİZ EKRANI ---
             DrawText("MAHJONG SOLITAIRE", 1020 / 2 - MeasureText("MAHJONG SOLITAIRE", 40) / 2, 80, 40, GOLD);
             DrawText("Shanghai Pyramid Matching Game", 1020 / 2 - MeasureText("Shanghai Pyramid Matching Game", 20) / 2, 130, 20, WHITE);
             
-            // Bilgi Kutusu
+            // Kurallar ve kontrollerin yazılı olduğu ana panelimiz:
             Rectangle info_rec = { 180, 180, 660, 360 };
             DrawRectangleRounded(info_rec, 0.05f, 4, (Color){ 30, 30, 35, 220 });
             DrawRectangleRoundedLines(info_rec, 0.05f, 4, GOLD);
@@ -635,7 +639,7 @@ int main() {
             DrawText("- Left Mouse Click: Select tiles and click buttons.", 210, y_off, 16, WHITE); y_off += 25;
             DrawText("- Tile layers are color-coded from level 0 to 3 (Gray to Orange).", 210, y_off, 16, WHITE);
             
-            // Başla Butonu
+            // Oyunu başlatan yeşil buton:
             GuiButton btn_start = { { 1020 / 2 - 100, 570, 200, 50 }, "START GAME", (Color){ 40, 160, 100, 255 }, (Color){ 60, 180, 120, 255 } };
             if (DrawButton(btn_start)) {
                 init_game();
@@ -645,7 +649,7 @@ int main() {
         } else if (current_state == STATE_PLAYING) {
             // --- OYUN EKRANI ---
             
-            // Panel Bölgesi (Sağ Bölge)
+            // Sağ taraftaki gri menü paneli:
             Rectangle sidebar_rec = { 825, 15, 180, 690 };
             DrawRectangleRounded(sidebar_rec, 0.03f, 4, (Color){ 30, 30, 35, 200 });
             DrawRectangleRoundedLines(sidebar_rec, 0.03f, 4, GRAY);
@@ -654,7 +658,7 @@ int main() {
             DrawText("Shanghai", 825 + (180 - MeasureText("Shanghai", 18)) / 2, 75, 18, LIGHTGRAY);
             DrawLine(840, 110, 990, 110, GRAY);
             
-            // Buton İşlevleri
+            // Butonlarımıza tıklandı mı diye sürekli kontrol ediyoruz:
             if (DrawButton(btn_hint)) {
                 int z1, y1, x1, z2, y2, x2;
                 int moves = get_available_moves(&z1, &y1, &x1, &z2, &y2, &x2);
@@ -710,7 +714,7 @@ int main() {
                 break;
             }
             
-            // İstatistik Göstergeleri
+            // Skor, kalan taş, hamle sayısı ve sürenin yazdığı şık kutumuz:
             Rectangle stat_rec = { 835, 450, 160, 230 };
             DrawRectangleRounded(stat_rec, 0.05f, 4, (Color){ 20, 20, 25, 230 });
             DrawRectangleRoundedLines(stat_rec, 0.05f, 4, GOLD);
@@ -743,7 +747,7 @@ int main() {
             }
             DrawText(sel_buf, 850, sy, 14, YELLOW);
             
-            // Tahta Etkileşimi
+            // Farenin altındaki en üst katmandaki taşı bulmak için 3'ten 0'a doğru geriye tarıyoruz:
             Vector2 m_pos = GetMousePosition();
             int hovered_z = -1, hovered_y = -1, hovered_x = -1;
             
@@ -767,14 +771,16 @@ int main() {
             }
             found_hover2:
             
-            // Fare Tıklamaları
+            // Oyuncu sol tıkladığında ve fare tahtanın üzerindeyse tıklama mantığını yürütüyoruz:
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && m_pos.x < 810) {
                 if (hovered_z != -1) {
                     if (is_tile_free(hovered_z, hovered_y, hovered_x)) {
+                        // Yeni tıklamada ipucu çizgilerini hemen kapatıyoruz:
                         game.hint_z1 = game.hint_y1 = game.hint_x1 = -1;
                         game.hint_z2 = game.hint_y2 = game.hint_x2 = -1;
                         
                         if (game.selected_z == -1) {
+                            // Henüz seçilmiş bir taş yoksa ilk taşı seçili hale getiriyoruz:
                             game.selected_z = hovered_z;
                             game.selected_y = hovered_y;
                             game.selected_x = hovered_x;
@@ -783,7 +789,9 @@ int main() {
                             get_tile_symbol(game.board[hovered_z][hovered_y][hovered_x].tile, s_name);
                             sprintf(game.status_log, "[Info] Selected: L%d - %s. Find a match.", hovered_z, s_name);
                         } else {
+                            // Zaten seçilmiş bir taş varsa, ikinci tıklanan taşla eşleşiyor mu diye bakıyoruz:
                             if (game.selected_z == hovered_z && game.selected_y == hovered_y && game.selected_x == hovered_x) {
+                                // Aynı taşa tekrar tıkladıysa seçimi iptal ediyoruz:
                                 game.selected_z = game.selected_y = game.selected_x = -1;
                                 strcpy(game.status_log, "[Info] Selection cleared.");
                             } else {
@@ -791,6 +799,7 @@ int main() {
                                 Tile t2 = game.board[hovered_z][hovered_y][hovered_x].tile;
                                 
                                 if (tiles_match(t1, t2)) {
+                                    // Taşlar eşleşti! Geri alma geçmişine ekliyoruz ve tahtadan kaldırıyoruz kanka:
                                     push_undo(game.selected_z, game.selected_y, game.selected_x, t1, 
                                               hovered_z, hovered_y, hovered_x, t2);
                                               
@@ -805,18 +814,20 @@ int main() {
                                     
                                     game.selected_z = game.selected_y = game.selected_x = -1;
                                 } else {
+                                    // Taşlar uyuşmuyorsa hata verip seçimi sıfırlıyoruz:
                                     strcpy(game.status_log, "[Error] Tiles do not match!");
                                     game.selected_z = game.selected_y = game.selected_x = -1;
                                 }
                             }
                         }
                     } else {
+                        // Taşın yanları veya üzeri kapalıysa uyarıyoruz:
                         strcpy(game.status_log, "[Error] Selected tile is blocked!");
                     }
                 }
             }
             
-            // Tahtayı Çiz ( Painters Algorithm )
+            // Şimdi tüm aktif taşları 3D hissiyle ekrana çizdiriyoruz (z=0'dan z=3'e doğru):
             for (int z = 0; z < 4; z++) {
                 for (int y = 0; y < 8; y++) {
                     for (int x = 0; x < 12; x++) {
@@ -832,7 +843,7 @@ int main() {
                 }
             }
             
-            // Log Bölgesi
+            // Alt taraftaki mesaj çubuğumuz. Eşleşme veya hata mesajları burada belirir:
             Rectangle log_rec = { start_x, 650, 730, 45 };
             DrawRectangleRounded(log_rec, 0.2f, 4, (Color){ 20, 20, 25, 230 });
             DrawRectangleRoundedLines(log_rec, 0.2f, 4, GRAY);
@@ -877,7 +888,7 @@ int main() {
         EndDrawing();
     }
     
-    // Grafik motorunu temizle ve kapat
+    // Oyunu düzgünce kapatıp Raylib kütüphanesini hafızadan temizliyoruz:
     CloseWindow();
     return 0;
 }
