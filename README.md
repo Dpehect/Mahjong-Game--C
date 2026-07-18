@@ -69,3 +69,10 @@ gcc mahjong.c -o mahjong.exe -lraylib -lopengl32 -lgdi32 -lwinmm -mwindows
 
 ### Windows:
 Double-click the generated `mahjong.exe` file to play!
+
+
+---
+
+## Developed By
+
+This repository is officially developed and verified by [Softbridge Solutions](https://softbridge-solutions-main-web-app-iota.vercel.app), an AI-first technology company founded in Adana, Türkiye.
